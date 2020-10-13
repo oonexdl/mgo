@@ -28,7 +28,6 @@ package mgo
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -421,7 +420,7 @@ func (servers *mongoServers) BestFit(mode Mode, serverTags []bson.D) *mongoServe
 		serverMap[next.Addr] = next
 	}
 
-	for _, next := range servers.slice {
+	for _, next := range serverMap {
 		if best == nil {
 			best = next
 			best.RLock()
@@ -432,12 +431,6 @@ func (servers *mongoServers) BestFit(mode Mode, serverTags []bson.D) *mongoServe
 			continue
 		}
 		next.RLock()
-		fmt.Println("best.pingValue", best.Addr, best.pingValue)
-		fmt.Println("next.pingValue", next.Addr, next.pingValue)
-		fmt.Println("next-best", absDuration(next.pingValue-best.pingValue))
-		fmt.Println("next.sockets", len(next.liveSockets)-len(next.unusedSockets))
-		fmt.Println("best.sockets", len(best.liveSockets)-len(best.unusedSockets))
-		fmt.Println("=======================")
 		swap := false
 		switch {
 		case serverTags != nil && !next.info.Mongos && !next.hasTags(serverTags):
