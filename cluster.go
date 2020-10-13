@@ -617,6 +617,10 @@ func (cluster *mongoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout 
 		}
 		cluster.RUnlock()
 
+		if server != nil {
+			fmt.Println("mongoserver", server.Addr)
+		}
+
 		if server == nil {
 			// Must have failed the requested tags. Sleep to avoid spinning.
 			time.Sleep(1e8)
