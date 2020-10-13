@@ -28,6 +28,7 @@ package mgo
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"sort"
 	"sync"
@@ -414,45 +415,36 @@ func (servers *mongoServers) HasMongos() bool {
 // BestFit returns the best guess of what would be the most interesting
 // server to perform operations on at this point in time.
 func (servers *mongoServers) BestFit(mode Mode, serverTags []bson.D) *mongoServer {
-	var best *mongoServer
+	suitable := make([]*mongoServer, 0, len(servers.slice))
 	for _, next := range servers.slice {
-		if best == nil {
-			best = next
-			best.RLock()
-			if serverTags != nil && !next.info.Mongos && !best.hasTags(serverTags) {
-				best.RUnlock()
-				best = nil
-			}
+		next.RLock()
+		if next.hasTags(serverTags) {
+			suitable = append(suitable, next)
+			next.RUnlock()
 			continue
 		}
-		next.RLock()
-		swap := false
-		switch {
-		case serverTags != nil && !next.info.Mongos && !next.hasTags(serverTags):
-			// Must have requested tags.
-		case mode == Secondary && next.info.Master && !next.info.Mongos:
-			// Must be a secondary or mongos.
-		case next.info.Master != best.info.Master && mode != Nearest:
-			// Prefer slaves, unless the mode is PrimaryPreferred.
-			swap = (mode == PrimaryPreferred) != best.info.Master
-		case absDuration(next.pingValue-best.pingValue) > 15*time.Millisecond:
-			// Prefer nearest server.
-			swap = next.pingValue < best.pingValue
-		case len(next.liveSockets)-len(next.unusedSockets) < len(best.liveSockets)-len(best.unusedSockets):
-			// Prefer servers with less connections.
-			swap = true
+
+		switch mode {
+		case Secondary, SecondaryPreferred:
+			if !next.info.Master {
+				suitable = append(suitable, next)
+			}
+		case PrimaryPreferred, Primary:
+			if next.info.Master {
+				suitable = append(suitable, next)
+			}
+		case Nearest, Monotonic, Eventual:
+			suitable = append(suitable, next)
 		}
-		if swap {
-			best.RUnlock()
-			best = next
-		} else {
-			next.RUnlock()
-		}
+
+		next.RUnlock()
 	}
-	if best != nil {
-		best.RUnlock()
+
+	if len(suitable) > 0 {
+		return suitable[rand.Intn(len(suitable))]
 	}
-	return best
+
+	return nil
 }
 
 func absDuration(d time.Duration) time.Duration {
