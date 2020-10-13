@@ -415,6 +415,11 @@ func (servers *mongoServers) HasMongos() bool {
 // server to perform operations on at this point in time.
 func (servers *mongoServers) BestFit(mode Mode, serverTags []bson.D) *mongoServer {
 	var best *mongoServer
+	serverMap := make(map[string]*mongoServer)
+	for _, next := range servers.slice {
+		serverMap[next.Addr] = next
+	}
+
 	for _, next := range servers.slice {
 		if best == nil {
 			best = next
